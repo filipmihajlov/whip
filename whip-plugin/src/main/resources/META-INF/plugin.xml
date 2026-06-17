@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin>
+    <id>com.whip.plugin</id>
+    <name>🪢 Whip</name>
+    <vendor email="support@whip.dev" url="https://github.com/yourusername/whip">Whip</vendor>
+    <description><![CDATA[
+        Crack an animated whip on top of your code — because sometimes your IDE <em>needs</em> it.
+        <br/><br/>
+        <strong>Hotkey:</strong> ⌘⇧↩ (Cmd+Shift+Enter) to crack the whip.
+        <br/><br/>
+        Features:
+        <ul>
+            <li>24-point Verlet physics whip animation</li>
+            <li>Radial flash impact effect</li>
+            <li>Synthesized whip-crack sound (no audio files)</li>
+            <li>Global hotkey support</li>
+        </ul>
+    ]]></description>
+    <version>1.0.0</version>
+    <idea-version since-build="233" until-build="241.*" />
+
+    <actions>
+        <action id="whip.crack" class="com.whip.WhipAction" text="Crack the Whip" description="Fire the whip animation">
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta shift ENTER" />
+        </action>
+    </actions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <editorFactoryListener implementation="com.whip.WhipEditorListener" />
+    </extensions>
+</idea-plugin>
+

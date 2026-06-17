@@ -4,6 +4,9 @@ node_modules/
 dist/
 build/
 out/
+# Gradle / plugin local caches
+.gradle/
+.local-tools/
 # Logs
 *.log
 npm-debug.log*
