@@ -181,19 +181,19 @@
     hp.frequency.exponentialRampToValueAtTime(8000, now + dur);
     const ng = ac.createGain();
     ng.gain.setValueAtTime(0.0001, now);
-    ng.gain.exponentialRampToValueAtTime(0.65 * mul, now + 0.004);
-    ng.gain.exponentialRampToValueAtTime(0.0005, now + dur);
-    noise.connect(hp); hp.connect(ng); ng.connect(ac.destination);
-    noise.start(now); noise.stop(now + dur);
+     ng.gain.exponentialRampToValueAtTime(0.78 * mul, now + 0.004);
+     ng.gain.exponentialRampToValueAtTime(0.0005, now + dur);
+     noise.connect(hp); hp.connect(ng); ng.connect(ac.destination);
+     noise.start(now); noise.stop(now + dur);
 
-    // 2) Low-frequency body — the "thwack".
-    const osc = ac.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(160, now);
-    osc.frequency.exponentialRampToValueAtTime(42, now + 0.1);
-    const og = ac.createGain();
-    og.gain.setValueAtTime(0.0001, now);
-    og.gain.exponentialRampToValueAtTime(0.45 * mul, now + 0.005);
+     // 2) Low-frequency body — the "thwack".
+     const osc = ac.createOscillator();
+     osc.type = 'sine';
+     osc.frequency.setValueAtTime(160, now);
+     osc.frequency.exponentialRampToValueAtTime(42, now + 0.1);
+     const og = ac.createGain();
+     og.gain.setValueAtTime(0.0001, now);
+     og.gain.exponentialRampToValueAtTime(0.54 * mul, now + 0.005);
     og.gain.exponentialRampToValueAtTime(0.0005, now + 0.12);
     osc.connect(og); og.connect(ac.destination);
     osc.start(now); osc.stop(now + 0.14);
@@ -348,7 +348,7 @@
       y: origin.y - dirY * 90 - 80,
     };
 
-    const T_WIND = 130, T_SNAP = 150, T_HOLD = 30, T_RECOIL = 380;
+    const T_WIND = 169, T_SNAP = 195, T_HOLD = 39, T_RECOIL = 494;
     const start = performance.now();
     let impacted = false;
 
