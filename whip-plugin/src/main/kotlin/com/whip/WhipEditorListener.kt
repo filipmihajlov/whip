@@ -1,39 +1,50 @@
 package com.whip
 
+import com.intellij.ide.DataManager
+import com.intellij.ide.IdeEventQueue
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
 import com.intellij.openapi.components.service
-import java.awt.event.KeyAdapter
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.util.Disposer
+import java.awt.Component
 import java.awt.event.KeyEvent
-import java.util.WeakHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 class WhipEditorListener : EditorFactoryListener {
-    private val listeners = WeakHashMap<com.intellij.openapi.editor.Editor, KeyAdapter>()
-
-    override fun editorCreated(event: EditorFactoryEvent) {
-        val editor = event.editor
-        val project = editor.project ?: return
-
-        val keyListener = object : KeyAdapter() {
-            override fun keyPressed(e: KeyEvent) {
-                if (e.keyCode != KeyEvent.VK_ENTER) return
-                if (e.isAltDown || e.isControlDown || e.isMetaDown) return
-
-                val settings = project.service<WhipSettingsState>().state
-                if (!settings.autoEnabled) return
-
-                WhipTrigger.trigger(project, settings.soundEnabled)
-            }
-        }
-
-        editor.contentComponent.addKeyListener(keyListener)
-        listeners[editor] = keyListener
+    companion object {
+        private val dispatcherInstalled = AtomicBoolean(false)
+        private val dispatcherDisposable = Disposer.newDisposable("WhipGlobalEnterDispatcher")
     }
 
-    override fun editorReleased(event: EditorFactoryEvent) {
-        val editor = event.editor
-        val keyListener = listeners.remove(editor) ?: return
-        editor.contentComponent.removeKeyListener(keyListener)
+    override fun editorCreated(event: EditorFactoryEvent) {
+        if (!dispatcherInstalled.compareAndSet(false, true)) return
+        IdeEventQueue.getInstance().addDispatcher({ awtEvent ->
+            val e = awtEvent as? KeyEvent ?: return@addDispatcher false
+            if (e.id != KeyEvent.KEY_PRESSED) return@addDispatcher false
+            if (e.keyCode != KeyEvent.VK_ENTER) return@addDispatcher false
+            if (e.isAltDown || e.isControlDown || e.isMetaDown) return@addDispatcher false
+
+            val component = e.component ?: return@addDispatcher false
+            val project = resolveProject(component) ?: return@addDispatcher false
+            if (project.isDisposed) return@addDispatcher false
+
+            val settings = project.service<WhipSettingsState>().state
+            if (!settings.autoEnabled) return@addDispatcher false
+
+            WhipTrigger.trigger(project, settings.soundEnabled)
+            false
+        }, dispatcherDisposable)
+    }
+
+    private fun resolveProject(component: Component): Project? {
+        val project = CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(component))
+        if (project != null) return project
+
+        val openProjects = ProjectManager.getInstance().openProjects
+        return openProjects.singleOrNull()
     }
 }
 

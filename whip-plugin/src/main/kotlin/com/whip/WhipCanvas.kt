@@ -25,14 +25,25 @@ class WhipCanvas : JPanel() {
 
     init {
         isOpaque = false
-        setSize(1920, 1080)
+    }
+
+    private fun stopAnimation() {
+        isActive = false
+        animationTimer?.stop()
+        animationTimer = null
+        repaint()
     }
 
     fun crack(playSound: Boolean = true) {
         if (isActive) return
         
         isActive = true
-        if (playSound) soundPlayer.playCrack(1.0)
+        if (playSound) {
+            Thread({ soundPlayer.playCrack(1.0) }, "whippy-sound").apply {
+                isDaemon = true
+                start()
+            }
+        }
         
         val origin = java.awt.Point(width * 4 / 5, height * 9 / 10)
         val target = java.awt.Point(width / 2, height / 3)
@@ -42,9 +53,10 @@ class WhipCanvas : JPanel() {
         val dx = target.x - origin.x
         val dy = target.y - origin.y
         val dist = hypot(dx.toDouble(), dy.toDouble())
+        val safeDist = if (dist > 0.001) dist else 1.0
         
-        val dirX = dx / dist
-        val dirY = dy / dist
+        val dirX = dx / safeDist
+        val dirY = dy / safeDist
         val windBack = Pair(
             origin.x - dirX * 108,
             origin.y - dirY * 108 - 96
@@ -56,52 +68,56 @@ class WhipCanvas : JPanel() {
         val T_RECOIL = 494L
         val startTime = System.currentTimeMillis()
         
-        animationTimer = Timer(16) { event: ActionEvent ->
-            val elapsed = System.currentTimeMillis() - startTime
-            
-            when {
-                elapsed < T_WIND -> {
-                    val k = easeOut(elapsed.toDouble() / T_WIND)
-                    verletRope.tipPos = Pair(
-                        origin.x + (windBack.first - origin.x) * k,
-                        origin.y + (windBack.second - origin.y) * k
-                    )
-                    verletRope.handlePos = Pair(
-                        origin.x - dirX * 10 * k,
-                        origin.y - dirY * 10 * k
-                    )
+        animationTimer?.stop()
+        animationTimer = Timer(16) { _: ActionEvent ->
+            try {
+                val elapsed = System.currentTimeMillis() - startTime
+
+                when {
+                    elapsed < T_WIND -> {
+                        val k = easeOut(elapsed.toDouble() / T_WIND)
+                        verletRope.tipPos = Pair(
+                            origin.x + (windBack.first - origin.x) * k,
+                            origin.y + (windBack.second - origin.y) * k
+                        )
+                        verletRope.handlePos = Pair(
+                            origin.x - dirX * 10 * k,
+                            origin.y - dirY * 10 * k
+                        )
+                    }
+                    elapsed < T_WIND + T_SNAP -> {
+                        val k = easeIn((elapsed - T_WIND).toDouble() / T_SNAP)
+                        verletRope.tipPos = Pair(
+                            windBack.first + (target.x - windBack.first) * k,
+                            windBack.second + (target.y - windBack.second) * k
+                        )
+                        val hk = easeOut((elapsed - T_WIND).toDouble() / T_SNAP)
+                        verletRope.handlePos = Pair(
+                            origin.x + dirX * 35 * hk,
+                            origin.y + dirY * 35 * hk
+                        )
+                    }
+                    elapsed < T_WIND + T_SNAP + T_HOLD -> {
+                        verletRope.tipPos = Pair(target.x.toDouble(), target.y.toDouble())
+                    }
+                    elapsed < T_WIND + T_SNAP + T_HOLD + T_RECOIL -> {
+                        val k = easeInOut((elapsed - T_WIND - T_SNAP - T_HOLD).toDouble() / T_RECOIL)
+                        verletRope.handlePos = Pair(
+                            origin.x + dirX * 35 * (1 - k),
+                            origin.y + dirY * 35 * (1 - k)
+                        )
+                    }
+                    else -> {
+                        stopAnimation()
+                        return@Timer
+                    }
                 }
-                elapsed < T_WIND + T_SNAP -> {
-                    val k = easeIn((elapsed - T_WIND).toDouble() / T_SNAP)
-                    verletRope.tipPos = Pair(
-                        windBack.first + (target.x - windBack.first) * k,
-                        windBack.second + (target.y - windBack.second) * k
-                    )
-                    val hk = easeOut((elapsed - T_WIND).toDouble() / T_SNAP)
-                    verletRope.handlePos = Pair(
-                        origin.x + dirX * 35 * hk,
-                        origin.y + dirY * 35 * hk
-                    )
-                }
-                elapsed < T_WIND + T_SNAP + T_HOLD -> {
-                    verletRope.tipPos = Pair(target.x.toDouble(), target.y.toDouble())
-                }
-                elapsed < T_WIND + T_SNAP + T_HOLD + T_RECOIL -> {
-                    val k = easeInOut((elapsed - T_WIND - T_SNAP - T_HOLD).toDouble() / T_RECOIL)
-                    verletRope.handlePos = Pair(
-                        origin.x + dirX * 35 * (1 - k),
-                        origin.y + dirY * 35 * (1 - k)
-                    )
-                }
-                else -> {
-                    isActive = false
-                    (event.source as Timer).stop()
-                    return@Timer
-                }
+
+                verletRope.update()
+                repaint()
+            } catch (_: Throwable) {
+                stopAnimation()
             }
-            
-            verletRope.update()
-            repaint()
         }
         
         animationTimer?.start()

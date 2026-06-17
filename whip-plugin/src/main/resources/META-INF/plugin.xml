@@ -24,6 +24,8 @@
     <actions>
         <action id="whip.crack" class="com.whip.WhipAction" text="Crack the Whip" description="Fire the whip animation">
             <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta shift ENTER" />
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta shift ENTER" />
+            <keyboard-shortcut keymap="macOS" first-keystroke="meta shift ENTER" />
         </action>
     </actions>
 

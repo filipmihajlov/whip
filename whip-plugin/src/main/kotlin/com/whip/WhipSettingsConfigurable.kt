@@ -11,10 +11,11 @@ import javax.swing.JPanel
 
 class WhipSettingsConfigurable : Configurable {
     private val panel = JPanel(GridLayout(0, 1, 0, 6))
-    private val autoCheck = JCheckBox("Auto-fire on Enter in editor")
+    private val autoCheck = JCheckBox("Auto-fire on Enter across IDE (editor, terminal, chat)")
     private val soundCheck = JCheckBox("Enable whip sound")
 
     init {
+
         panel.add(JLabel("Whippy settings"))
         panel.add(autoCheck)
         panel.add(soundCheck)

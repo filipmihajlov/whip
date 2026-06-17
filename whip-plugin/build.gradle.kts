@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.whip"
-version = "1.0.2"
+version = "1.0.4"
 
 repositories {
     mavenCentral()
@@ -25,7 +25,7 @@ tasks {
 
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("241.*")
+        untilBuild.set("252.*")
     }
 }
 

@@ -222,6 +222,18 @@
   let tipPinned = false;
   let active = false;
   const trail = [];
+  let crackRaf = 0;
+  let crackDeadline = 0;
+
+  function stopCrack() {
+    active = false;
+    tipPinned = false;
+    crackDeadline = 0;
+    if (crackRaf) {
+      cancelAnimationFrame(crackRaf);
+      crackRaf = 0;
+    }
+  }
 
   function resetRope(x, y) {
     for (const p of points) { p.x = p.ox = x; p.y = p.oy = y; }
@@ -313,6 +325,10 @@
   function loop() {
     ctx.clearRect(0, 0, innerWidth, innerHeight);
     if (active) {
+      // Safety net: guarantees teardown if animation callbacks are interrupted.
+      if (crackDeadline && performance.now() > crackDeadline) {
+        stopCrack();
+      }
       physicsStep();
       const tipP = points[N - 1];
       trail.push({ x: tipP.x, y: tipP.y });
@@ -338,6 +354,7 @@
     const dist = Math.hypot(dx, dy) || 1;
     segLen = Math.max(14, (dist * 1.08) / (N - 1));
 
+    stopCrack();
     resetRope(origin.x, origin.y);
     active = true;
     tipPinned = true;
@@ -350,38 +367,44 @@
 
     const T_WIND = 169, T_SNAP = 195, T_HOLD = 39, T_RECOIL = 494;
     const start = performance.now();
+    crackDeadline = start + T_WIND + T_SNAP + T_HOLD + T_RECOIL + 250;
     let impacted = false;
 
     function step(now) {
-      const t = now - start;
-      if (t < T_WIND) {
-        const k = easeOut(t / T_WIND);
-        tip.x = origin.x + (windBack.x - origin.x) * k;
-        tip.y = origin.y + (windBack.y - origin.y) * k;
-        handle.x = origin.x - dirX * 10 * k;
-        handle.y = origin.y - dirY * 10 * k;
-      } else if (t < T_WIND + T_SNAP) {
-        const k = easeIn((t - T_WIND) / T_SNAP);
-        tip.x = windBack.x + (target.x - windBack.x) * k;
-        tip.y = windBack.y + (target.y - windBack.y) * k;
-        const hk = easeOut((t - T_WIND) / T_SNAP);
-        handle.x = origin.x + dirX * 35 * hk;
-        handle.y = origin.y + dirY * 35 * hk;
-      } else if (t < T_WIND + T_SNAP + T_HOLD) {
-        tip.x = target.x; tip.y = target.y;
-        if (!impacted) { impacted = true; impact(target, intensityMul); }
-      } else if (t < T_WIND + T_SNAP + T_HOLD + T_RECOIL) {
-        tipPinned = false;
-        const k = easeInOut((t - T_WIND - T_SNAP - T_HOLD) / T_RECOIL);
-        handle.x = origin.x + dirX * 35 * (1 - k);
-        handle.y = origin.y + dirY * 35 * (1 - k);
-      } else {
-        active = false;
+      try {
+        const t = now - start;
+        if (t < T_WIND) {
+          const k = easeOut(t / T_WIND);
+          tip.x = origin.x + (windBack.x - origin.x) * k;
+          tip.y = origin.y + (windBack.y - origin.y) * k;
+          handle.x = origin.x - dirX * 10 * k;
+          handle.y = origin.y - dirY * 10 * k;
+        } else if (t < T_WIND + T_SNAP) {
+          const k = easeIn((t - T_WIND) / T_SNAP);
+          tip.x = windBack.x + (target.x - windBack.x) * k;
+          tip.y = windBack.y + (target.y - windBack.y) * k;
+          const hk = easeOut((t - T_WIND) / T_SNAP);
+          handle.x = origin.x + dirX * 35 * hk;
+          handle.y = origin.y + dirY * 35 * hk;
+        } else if (t < T_WIND + T_SNAP + T_HOLD) {
+          tip.x = target.x; tip.y = target.y;
+          if (!impacted) { impacted = true; impact(target, intensityMul); }
+        } else if (t < T_WIND + T_SNAP + T_HOLD + T_RECOIL) {
+          tipPinned = false;
+          const k = easeInOut((t - T_WIND - T_SNAP - T_HOLD) / T_RECOIL);
+          handle.x = origin.x + dirX * 35 * (1 - k);
+          handle.y = origin.y + dirY * 35 * (1 - k);
+        } else {
+          stopCrack();
+          return;
+        }
+      } catch {
+        stopCrack();
         return;
       }
-      requestAnimationFrame(step);
+      crackRaf = requestAnimationFrame(step);
     }
-    requestAnimationFrame(step);
+    crackRaf = requestAnimationFrame(step);
   }
 
   function impact(at, mul) {

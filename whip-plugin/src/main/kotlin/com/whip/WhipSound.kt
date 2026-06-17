@@ -2,6 +2,7 @@ package com.whip
 
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
+import java.awt.Toolkit
 import kotlin.math.pow
 
 class WhipSound {
@@ -59,7 +60,7 @@ class WhipSound {
             thwackLine.drain()
             thwackLine.close()
         } catch (e: Exception) {
-            e.printStackTrace()
+            Toolkit.getDefaultToolkit().beep()
         }
     }
 }
