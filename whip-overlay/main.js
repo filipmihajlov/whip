@@ -27,7 +27,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 const HOTKEY = process.env.WHIP_HOTKEY || 'CommandOrControl+Shift+Return';
 const CALIBRATE_HOTKEY = 'CommandOrControl+Shift+Alt+W';
 const AUTO_COOLDOWN_MS = 400;   // throttle to avoid overlapping cracks
-const AUTO_REQUIRE_META = true; // true = fire only on ⌘+Enter; false = any Enter
+const AUTO_REQUIRE_META = false; // true = fire only on ⌘+Enter; false = any Enter
 const HTTP_PORT = Number(process.env.WHIP_HTTP_PORT) || 7654;
 
 let win = null;
