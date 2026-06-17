@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <idea-plugin>
     <id>com.whip.plugin</id>
-    <name>🪢 Whip</name>
+    <name>Whippy</name>
     <vendor email="support@whip.dev" url="https://github.com/yourusername/whip">Whip</vendor>
     <description><![CDATA[
         Crack an animated whip on top of your code — because sometimes your IDE <em>needs</em> it.
@@ -13,11 +13,13 @@
             <li>24-point Verlet physics whip animation</li>
             <li>Radial flash impact effect</li>
             <li>Synthesized whip-crack sound (no audio files)</li>
-            <li>Global hotkey support</li>
+            <li>Hotkey support and optional auto-fire</li>
+            <li>Configurable sound and auto mode in Settings</li>
         </ul>
     ]]></description>
     <version>1.0.0</version>
     <idea-version since-build="233" until-build="241.*" />
+    <depends>com.intellij.modules.platform</depends>
 
     <actions>
         <action id="whip.crack" class="com.whip.WhipAction" text="Crack the Whip" description="Fire the whip animation">
@@ -26,6 +28,8 @@
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="com.whip.WhipSettingsState"/>
+        <applicationConfigurable id="whippy.settings" displayName="Whippy" parentId="tools" instance="com.whip.WhipSettingsConfigurable"/>
         <editorFactoryListener implementation="com.whip.WhipEditorListener" />
     </extensions>
 </idea-plugin>

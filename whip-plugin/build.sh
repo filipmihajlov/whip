@@ -40,7 +40,7 @@ echo "Running buildPlugin..."
 echo ""
 echo "✅ Build complete!"
 echo ""
-JAR_PATH=$(find "$PLUGIN_DIR/build/distributions" -name "*.zip" | head -1)
+JAR_PATH=$(ls -t "$PLUGIN_DIR"/build/distributions/*.zip 2>/dev/null | head -1)
 if [ -f "$JAR_PATH" ]; then
     echo "📦 Plugin JAR: $JAR_PATH"
     echo ""

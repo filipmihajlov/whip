@@ -28,11 +28,11 @@ class WhipCanvas : JPanel() {
         setSize(1920, 1080)
     }
 
-    fun crack() {
+    fun crack(playSound: Boolean = true) {
         if (isActive) return
         
         isActive = true
-        soundPlayer.playCrack(1.0)
+        if (playSound) soundPlayer.playCrack(1.0)
         
         val origin = java.awt.Point(width * 4 / 5, height * 9 / 10)
         val target = java.awt.Point(width / 2, height / 3)

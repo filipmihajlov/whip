@@ -8,7 +8,7 @@ A JetBrains IDE plugin that cracks an animated whip on top of your code — beca
 - **Hotkey support** — Press **⌘⇧↩** (Cmd+Shift+Enter) to fire
 - **Synthesized sound** — crack + thwack, generated in real-time (no audio files)
 - **Impact effects** — radial flash and screen shake
-- **Customizable** — adjust speed, size, and volume in settings (future versions)
+- **Customizable** — toggle auto-fire and sound in **Settings | Tools | Whippy**
 
 ## Installation
 
