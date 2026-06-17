@@ -14,7 +14,8 @@
             <li>Radial flash impact effect</li>
             <li>Synthesized whip-crack sound (no audio files)</li>
             <li>Hotkey support and optional auto-fire</li>
-            <li>Configurable sound and auto mode in Settings</li>
+            <li>Drag-to-position whip start and end points for custom layout and length</li>
+            <li>Configurable sound, auto mode, color themes, and speed profiles in Settings</li>
         </ul>
     ]]></description>
     <version>1.0.0</version>
@@ -26,6 +27,9 @@
             <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta shift ENTER" />
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta shift ENTER" />
             <keyboard-shortcut keymap="macOS" first-keystroke="meta shift ENTER" />
+        </action>
+        <action id="whip.calibrate" class="com.whip.WhipCalibrateAction" text="Calibrate Whip Layout" description="Drag the whip start and end points">
+            <add-to-group group-id="ToolsMenu" anchor="last" />
         </action>
     </actions>
 

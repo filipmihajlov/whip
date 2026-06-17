@@ -33,8 +33,9 @@ class WhipEditorListener : EditorFactoryListener {
 
             val settings = project.service<WhipSettingsState>().state
             if (!settings.autoEnabled) return@addDispatcher false
+            if (WhipTrigger.isCalibrationActive(project)) return@addDispatcher false
 
-            WhipTrigger.trigger(project, settings.soundEnabled)
+            WhipTrigger.trigger(project, settings.toRuntimeOptions())
             false
         }, dispatcherDisposable)
     }

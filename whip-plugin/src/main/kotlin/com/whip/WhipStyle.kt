@@ -14,6 +14,7 @@ data class WhipRuntimeOptions(
     val playSound: Boolean,
     val colorStyle: WhipColorStyle,
     val speedStyle: WhipSpeedStyle,
+    val layoutRatios: WhipLayoutRatios = WhipLayoutRatios(),
 )
 
 enum class WhipColorStyle(
@@ -108,4 +109,10 @@ fun WhipSettingsState.Settings.toRuntimeOptions(): WhipRuntimeOptions = WhipRunt
     playSound = soundEnabled,
     colorStyle = WhipColorStyle.fromId(colorStyleId),
     speedStyle = WhipSpeedStyle.fromId(speedStyleId),
+    layoutRatios = WhipLayoutRatios(
+        originXRatio = originXRatio,
+        originYRatio = originYRatio,
+        targetXRatio = targetXRatio,
+        targetYRatio = targetYRatio,
+    ),
 )

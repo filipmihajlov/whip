@@ -166,6 +166,24 @@
       <input type="checkbox" id="sound">
     </div>
     <div class="row">
+      <label for="color">Whip color</label>
+      <select id="color">
+        <option value="classic" selected>Classic leather</option>
+        <option value="crimson">Crimson lash</option>
+        <option value="emerald">Emerald viper</option>
+        <option value="sapphire">Sapphire arc</option>
+        <option value="violet">Violet storm</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="speed">Whip speed</label>
+      <select id="speed">
+        <option value="slow">Slow</option>
+        <option value="normal" selected>Normal</option>
+        <option value="fast">Fast</option>
+      </select>
+    </div>
+    <div class="row">
       <label for="damage">Damage popup</label>
       <input type="checkbox" id="damage" checked>
     </div>
@@ -196,8 +214,79 @@
   const sendBtn = composer.querySelector('button');
   const intensityEl = document.getElementById('intensity');
   const soundEl = document.getElementById('sound');
+  const colorEl = document.getElementById('color');
+  const speedEl = document.getElementById('speed');
   const damageEl = document.getElementById('damage');
   const counterEl = document.getElementById('counter');
+
+  const COLOR_THEMES = {
+    classic: {
+      shadow: 'rgba(0,0,0,0.35)',
+      start: [80, 50, 30],
+      end: [50, 25, 10],
+      highlight: [220, 180, 140],
+      handleBase: '#3a2418',
+      handleWrap: '#5b3a22',
+      pommel: '#caa050',
+    },
+    crimson: {
+      shadow: 'rgba(45,6,10,0.35)',
+      start: [154, 62, 56],
+      end: [92, 24, 24],
+      highlight: [255, 196, 184],
+      handleBase: '#4a1f1a',
+      handleWrap: '#74332c',
+      pommel: '#d8b36a',
+    },
+    emerald: {
+      shadow: 'rgba(6,28,18,0.35)',
+      start: [72, 132, 88],
+      end: [20, 78, 46],
+      highlight: [174, 232, 190],
+      handleBase: '#163528',
+      handleWrap: '#2f5c48',
+      pommel: '#d2c86b',
+    },
+    sapphire: {
+      shadow: 'rgba(8,16,40,0.35)',
+      start: [78, 116, 190],
+      end: [26, 52, 120],
+      highlight: [188, 214, 255],
+      handleBase: '#1a2746',
+      handleWrap: '#304c82',
+      pommel: '#b8caef',
+    },
+    violet: {
+      shadow: 'rgba(26,10,34,0.35)',
+      start: [136, 92, 184],
+      end: [78, 42, 128],
+      highlight: [222, 190, 255],
+      handleBase: '#311b45',
+      handleWrap: '#59337a',
+      pommel: '#ceb2f2',
+    },
+  };
+  const SPEED_PROFILES = {
+    slow: { scale: 1.25 },
+    normal: { scale: 1.0 },
+    fast: { scale: 0.8 },
+  };
+  const clamp01 = (value) => Math.max(0, Math.min(1, value));
+  const lerp = (start, end, t) => Math.round(start + (end - start) * t);
+  function currentTheme() {
+    return COLOR_THEMES[colorEl.value] || COLOR_THEMES.classic;
+  }
+  function currentSpeedProfile() {
+    return SPEED_PROFILES[speedEl.value] || SPEED_PROFILES.normal;
+  }
+  function colorAt(theme, t) {
+    const k = clamp01(t);
+    return `rgb(${lerp(theme.start[0], theme.end[0], k)}, ${lerp(theme.start[1], theme.end[1], k)}, ${lerp(theme.start[2], theme.end[2], k)})`;
+  }
+  function highlightAt(theme, t) {
+    const alpha = 0.18 * (1 - clamp01(t));
+    return `rgba(${theme.highlight[0]}, ${theme.highlight[1]}, ${theme.highlight[2]}, ${alpha})`;
+  }
 
   // ========== Canvas sizing (HiDPI)
   function resize() {
@@ -286,6 +375,7 @@
 
   function drawRope() {
     if (!active) return;
+    const theme = currentTheme();
 
     // Speed-line trail behind the tip
     if (trail.length > 1) {
@@ -311,7 +401,7 @@
       const w = 7 * (1 - t) + 0.8 * t;
 
       // shadow
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.strokeStyle = theme.shadow;
       ctx.lineWidth = w + 1.5;
       ctx.beginPath();
       ctx.moveTo(a.x + 1.5, a.y + 2.5);
@@ -319,10 +409,7 @@
       ctx.stroke();
 
       // body — dark leather gradient (handle → tip)
-      const r = Math.floor(80 - 30 * t);
-      const g = Math.floor(50 - 25 * t);
-      const bch = Math.floor(30 - 20 * t);
-      ctx.strokeStyle = `rgb(${r}, ${g}, ${bch})`;
+      ctx.strokeStyle = colorAt(theme, t);
       ctx.lineWidth = w;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
@@ -330,7 +417,7 @@
       ctx.stroke();
 
       // highlight (top edge)
-      ctx.strokeStyle = `rgba(220,180,140,${0.18 * (1 - t)})`;
+      ctx.strokeStyle = highlightAt(theme, t);
       ctx.lineWidth = w * 0.4;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y - w * 0.25);
@@ -344,12 +431,12 @@
     ctx.save();
     ctx.translate(p0.x, p0.y);
     ctx.rotate(ang + Math.PI); // grip extends opposite to rope
-    ctx.fillStyle = '#3a2418';
+    ctx.fillStyle = theme.handleBase;
     ctx.fillRect(0, -6, 26, 12);
-    ctx.fillStyle = '#5b3a22';
+    ctx.fillStyle = theme.handleWrap;
     for (let i = 4; i < 26; i += 4) ctx.fillRect(i, -6, 1, 12);
     // pommel
-    ctx.fillStyle = '#caa050';
+    ctx.fillStyle = theme.pommel;
     ctx.beginPath();
     ctx.arc(26, 0, 4, 0, Math.PI * 2);
     ctx.fill();
@@ -413,10 +500,11 @@
       y: origin.y - dirY * 90 - 80,
     };
 
-    const T_WIND = 169;
-    const T_SNAP = intensity === 'merciless' ? 143 : 195;
-    const T_HOLD = 39;
-    const T_RECOIL = 494;
+    const speedScale = currentSpeedProfile().scale;
+    const T_WIND = Math.round(169 * speedScale);
+    const T_SNAP = Math.round((intensity === 'merciless' ? 143 : 195) * speedScale);
+    const T_HOLD = Math.round(39 * speedScale);
+    const T_RECOIL = Math.round(494 * speedScale);
     const start = performance.now();
     crackDeadline = start + T_WIND + T_SNAP + T_HOLD + T_RECOIL + 250;
     let impacted = false;

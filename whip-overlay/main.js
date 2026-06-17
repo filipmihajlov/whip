@@ -29,12 +29,26 @@ const CALIBRATE_HOTKEY = 'CommandOrControl+Shift+Alt+W';
 const AUTO_COOLDOWN_MS = 400;   // throttle to avoid overlapping cracks
 const AUTO_REQUIRE_META = false; // true = fire only on ⌘+Enter; false = any Enter
 const HTTP_PORT = Number(process.env.WHIP_HTTP_PORT) || 7654;
+const COLOR_OPTIONS = [
+  { id: 'classic', label: 'Classic leather' },
+  { id: 'crimson', label: 'Crimson lash' },
+  { id: 'emerald', label: 'Emerald viper' },
+  { id: 'sapphire', label: 'Sapphire arc' },
+  { id: 'violet', label: 'Violet storm' },
+];
+const SPEED_OPTIONS = [
+  { id: 'slow', label: 'Slow' },
+  { id: 'normal', label: 'Normal' },
+  { id: 'fast', label: 'Fast' },
+];
 
 let win = null;
 let tray = null;
 let httpServer = null;
 let soundEnabled = true; // hydrated from renderer
 let autoEnabled = false; // hydrated from renderer
+let whipColor = 'classic'; // hydrated from renderer
+let whipSpeed = 'normal'; // hydrated from renderer
 let hookStarted = false;
 let lastAutoFire = 0;
 
@@ -135,6 +149,24 @@ function rebuildTrayMenu() {
         }
       },
     },
+    {
+      label: 'Whip color',
+      submenu: COLOR_OPTIONS.map((option) => ({
+        label: option.label,
+        type: 'radio',
+        checked: whipColor === option.id,
+        click: () => setWhipColor(option.id, /* fromTray */ true),
+      })),
+    },
+    {
+      label: 'Whip speed',
+      submenu: SPEED_OPTIONS.map((option) => ({
+        label: option.label,
+        type: 'radio',
+        checked: whipSpeed === option.id,
+        click: () => setWhipSpeed(option.id, /* fromTray */ true),
+      })),
+    },
     { type: 'separator' },
     { label: `HTTP trigger: 127.0.0.1:${HTTP_PORT}/crack`, enabled: false },
     { label: `Calibrate origin/target (${CALIBRATE_HOTKEY})`, click: () => toggleCalibration() },
@@ -181,6 +213,24 @@ function setAuto(on, fromTray = false) {
   if (autoEnabled) startHook();
   else stopHook();
   if (win && !win.isDestroyed()) win.webContents.send('whip-auto', autoEnabled);
+  if (fromTray) rebuildTrayMenu();
+}
+
+function setWhipColor(id, fromTray = false) {
+  const nextColor = COLOR_OPTIONS.some((option) => option.id === id) ? id : 'classic';
+  whipColor = nextColor;
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('whip-color', whipColor);
+  }
+  if (fromTray) rebuildTrayMenu();
+}
+
+function setWhipSpeed(id, fromTray = false) {
+  const nextSpeed = SPEED_OPTIONS.some((option) => option.id === id) ? id : 'normal';
+  whipSpeed = nextSpeed;
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('whip-speed', whipSpeed);
+  }
   if (fromTray) rebuildTrayMenu();
 }
 
@@ -299,6 +349,16 @@ app.whenReady().then(() => {
         startHook();
       }
     }
+    rebuildTrayMenu();
+  });
+
+  ipcMain.on('whip-color-init', (_, id) => {
+    whipColor = COLOR_OPTIONS.some((option) => option.id === id) ? id : 'classic';
+    rebuildTrayMenu();
+  });
+
+  ipcMain.on('whip-speed-init', (_, id) => {
+    whipSpeed = SPEED_OPTIONS.some((option) => option.id === id) ? id : 'normal';
     rebuildTrayMenu();
   });
 });

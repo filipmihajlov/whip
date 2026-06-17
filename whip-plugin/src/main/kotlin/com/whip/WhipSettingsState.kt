@@ -9,6 +9,12 @@ class WhipSettingsState : PersistentStateComponent<WhipSettingsState.Settings> {
     data class Settings(
         var soundEnabled: Boolean = true,
         var autoEnabled: Boolean = false,
+        var colorStyleId: String = WhipColorStyle.CLASSIC.id,
+        var speedStyleId: String = WhipSpeedStyle.NORMAL.id,
+        var originXRatio: Double? = null,
+        var originYRatio: Double? = null,
+        var targetXRatio: Double? = null,
+        var targetYRatio: Double? = null,
     )
 
     private var settings = Settings()

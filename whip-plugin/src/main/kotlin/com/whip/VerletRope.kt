@@ -11,6 +11,14 @@ class VerletRope(private val numPoints: Int) {
     private var tipPinned = true
     private var segLen = 18.0
 
+    fun setSegmentLength(length: Double) {
+        segLen = length.coerceAtLeast(1.0)
+    }
+
+    fun setTipPinned(pinned: Boolean) {
+        tipPinned = pinned
+    }
+
     fun resetRope(x: Double, y: Double) {
         for (p in points) {
             p.x = x
@@ -49,7 +57,8 @@ class VerletRope(private val numPoints: Int) {
                 val b = points[i + 1]
                 val dx = b.x - a.x
                 val dy = b.y - a.y
-                val d = hypot(dx, dy)
+                // Match demo/overlay behavior: avoid division by zero when adjacent points overlap.
+                val d = hypot(dx, dy).coerceAtLeast(0.0001)
                 val diff = (d - segLen) / d
 
                 val aFixed = (i == 0)
