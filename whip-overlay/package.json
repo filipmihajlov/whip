@@ -1,0 +1,16 @@
+{
+  "name": "whip-overlay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Transparent always-on-top whip animation that cracks on top of any window. Bind a hotkey, smack your AI assistant.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  },
+  "dependencies": {
+    "uiohook-napi": "^1.5.5"
+  }
+}

@@ -1,0 +1,513 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Whip Overlay</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    background: transparent;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-user-select: none;
+    cursor: default;
+  }
+  canvas {
+    position: fixed; inset: 0;
+    pointer-events: none;
+  }
+  .floater {
+    position: fixed; pointer-events: none;
+    font-weight: 800; color: #ff4d4d; font-size: 26px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8), 0 0 12px rgba(255,77,77,0.6);
+    will-change: transform, opacity;
+  }
+  .flash {
+    position: fixed; pointer-events: none;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,210,160,0.55) 40%, rgba(255,80,40,0) 70%);
+    mix-blend-mode: screen;
+    will-change: transform, opacity;
+  }
+
+  /* Calibration overlay */
+  #cal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: center; justify-content: center;
+    flex-direction: column;
+    color: #fff;
+    z-index: 10;
+    pointer-events: auto;
+  }
+  #cal.on { display: flex; }
+  #cal .card {
+    background: #2b2d30; border: 1px solid #393b40;
+    border-radius: 12px; padding: 18px 22px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    max-width: 520px; text-align: center;
+  }
+  #cal h1 { margin: 0 0 8px; font-size: 18px; }
+  #cal p { margin: 6px 0; font-size: 14px; color: #cfd2d8; line-height: 1.5; }
+  #cal kbd {
+    background: #393b40; border: 1px solid #4a4d54; border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 6px; font-size: 12px; font-family: ui-monospace, monospace;
+  }
+  #cal button {
+    margin-top: 10px; background: #4d9aff; color: white; border: 0;
+    padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer;
+  }
+  .marker {
+    position: fixed;
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 3px solid #fff;
+    background: rgba(255,255,255,0.15);
+    box-shadow: 0 0 20px rgba(255,255,255,0.4), inset 0 0 12px rgba(255,255,255,0.4);
+    transform: translate(-50%, -50%);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; color: #fff; pointer-events: auto; cursor: grab;
+    user-select: none;
+    z-index: 20;          /* MUST sit above the dim #cal layer (z-index: 10) */
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .marker.dragging { cursor: grabbing; animation: none; }
+  .marker.origin { border-color: #4ade80; box-shadow: 0 0 20px rgba(74,222,128,0.6); }
+  .marker.target { border-color: #ff4d4d; box-shadow: 0 0 20px rgba(255,77,77,0.6); }
+
+  @keyframes pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50%      { transform: translate(-50%, -50%) scale(1.12); }
+  }
+</style>
+</head>
+<body>
+<canvas id="overlay"></canvas>
+
+<!-- Calibration UI -->
+<div id="cal" aria-hidden="true">
+  <div class="card">
+    <h1>Calibrate the whip 🪢</h1>
+    <p>Drag the <strong style="color:#4ade80">green</strong> marker to where your <strong>Send</strong> button is.<br>
+       Drag the <strong style="color:#ff4d4d">red</strong> marker to where the <strong>assistant avatar</strong> sits.</p>
+    <p>Press <kbd>Enter</kbd> to save, <kbd>Esc</kbd> to cancel, or click below.</p>
+    <button id="cal-save">Save &amp; close</button>
+    <button id="cal-test" style="background:#393b40">Test crack</button>
+  </div>
+</div>
+<div id="marker-origin" class="marker origin" style="display:none">S</div>
+<div id="marker-target" class="marker target" style="display:none">A</div>
+
+<script>
+(() => {
+  // ===== Config persistence =====
+  const LS_KEY = 'whip-config-v1';
+  const cfg = (() => {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+    catch { return {}; }
+  })();
+  function saveCfg() { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); }
+
+  function defaultOrigin() {
+    // Bottom-right area — where a tool-window Send button usually sits.
+    return { x: Math.round(innerWidth * 0.82), y: Math.round(innerHeight * 0.85) };
+  }
+  function defaultTarget() {
+    // Upper-middle of right side — roughly where chat messages live.
+    return { x: Math.round(innerWidth * 0.65), y: Math.round(innerHeight * 0.35) };
+  }
+
+  function getOrigin() { return cfg.origin || defaultOrigin(); }
+  function getTarget() { return cfg.target || defaultTarget(); }
+
+  // ===== Sound state (persists in localStorage, syncs with tray toggle) =====
+  let soundEnabled = cfg.soundEnabled ?? true;
+  function setSound(on, fromBridge = false) {
+    soundEnabled = !!on;
+    cfg.soundEnabled = soundEnabled;
+    saveCfg();
+    if (!fromBridge) {
+      // Tell main so the tray checkbox stays in sync.
+      window.whipBridge && window.whipBridge.reportSound(soundEnabled);
+    }
+  }
+  // Announce our initial value so the tray menu reflects it.
+  window.whipBridge && window.whipBridge.reportSound(soundEnabled);
+  window.whipBridge && window.whipBridge.onSoundChange((v) => setSound(v, true));
+
+  // ===== Auto-fire state (persists in localStorage; main owns the OS hook) =====
+  let autoEnabled = cfg.autoEnabled ?? false;
+  function setAuto(on) {
+    autoEnabled = !!on;
+    cfg.autoEnabled = autoEnabled;
+    saveCfg();
+  }
+  // Announce our initial value so main can re-arm the hook after restart.
+  window.whipBridge && window.whipBridge.reportAuto(autoEnabled);
+  window.whipBridge && window.whipBridge.onAutoChange((v) => setAuto(v));
+
+  // ===== Whip-crack synth (WebAudio, no asset files) =====
+  let audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    return audioCtx;
+  }
+  // Warm up the context up-front so the first crack isn't silent.
+  try { ensureAudio(); } catch {}
+
+  function playCrack(mul = 1) {
+    if (!soundEnabled) return;
+    let ac;
+    try { ac = ensureAudio(); } catch { return; }
+    const now = ac.currentTime;
+
+    // 1) High-pitched noise burst with high-pass sweep — the "crack".
+    const dur = 0.2;
+    const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * dur), ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const env = Math.exp(-i / data.length * 8);
+      data[i] = (Math.random() * 2 - 1) * env;
+    }
+    const noise = ac.createBufferSource();
+    noise.buffer = buf;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(500, now);
+    hp.frequency.exponentialRampToValueAtTime(8000, now + dur);
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, now);
+    ng.gain.exponentialRampToValueAtTime(0.65 * mul, now + 0.004);
+    ng.gain.exponentialRampToValueAtTime(0.0005, now + dur);
+    noise.connect(hp); hp.connect(ng); ng.connect(ac.destination);
+    noise.start(now); noise.stop(now + dur);
+
+    // 2) Low-frequency body — the "thwack".
+    const osc = ac.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(42, now + 0.1);
+    const og = ac.createGain();
+    og.gain.setValueAtTime(0.0001, now);
+    og.gain.exponentialRampToValueAtTime(0.45 * mul, now + 0.005);
+    og.gain.exponentialRampToValueAtTime(0.0005, now + 0.12);
+    osc.connect(og); og.connect(ac.destination);
+    osc.start(now); osc.stop(now + 0.14);
+  }
+
+  // ===== Canvas (HiDPI) =====
+  const canvas = document.getElementById('overlay');
+  const ctx = canvas.getContext('2d');
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  // ===== Verlet whip =====
+  const N = 24;
+  const points = Array.from({ length: N }, () => ({ x: 0, y: 0, ox: 0, oy: 0 }));
+  let segLen = 18;
+  const handle = { x: 0, y: 0 };
+  const tip = { x: 0, y: 0 };
+  let tipPinned = false;
+  let active = false;
+  const trail = [];
+
+  function resetRope(x, y) {
+    for (const p of points) { p.x = p.ox = x; p.y = p.oy = y; }
+    handle.x = x; handle.y = y; tip.x = x; tip.y = y;
+    trail.length = 0;
+  }
+
+  function physicsStep() {
+    for (const p of points) {
+      const vx = (p.x - p.ox) * 0.985;
+      const vy = (p.y - p.oy) * 0.985;
+      p.ox = p.x; p.oy = p.y;
+      p.x += vx;
+      p.y += vy + 0.45;
+    }
+    for (let it = 0; it < 18; it++) {
+      points[0].x = handle.x;
+      points[0].y = handle.y;
+      if (tipPinned) {
+        points[N - 1].x = tip.x;
+        points[N - 1].y = tip.y;
+      }
+      for (let i = 0; i < N - 1; i++) {
+        const a = points[i], b = points[i + 1];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.hypot(dx, dy) || 0.0001;
+        const diff = (d - segLen) / d;
+        const aFixed = (i === 0);
+        const bFixed = (i + 1 === N - 1) && tipPinned;
+        if (aFixed) {
+          b.x -= dx * diff; b.y -= dy * diff;
+        } else if (bFixed) {
+          a.x += dx * diff; a.y += dy * diff;
+        } else {
+          a.x += dx * diff * 0.5; a.y += dy * diff * 0.5;
+          b.x -= dx * diff * 0.5; b.y -= dy * diff * 0.5;
+        }
+      }
+    }
+  }
+
+  function drawRope() {
+    if (!active) return;
+    if (trail.length > 1) {
+      for (let i = 1; i < trail.length; i++) {
+        const a = trail[i - 1], b = trail[i];
+        const k = i / trail.length;
+        ctx.strokeStyle = `rgba(255, 240, 210, ${k * 0.55})`;
+        ctx.lineWidth = 2.5 * k;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    }
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (let i = 0; i < N - 1; i++) {
+      const a = points[i], b = points[i + 1];
+      const t = i / (N - 1);
+      const w = 7 * (1 - t) + 0.8 * t;
+      // shadow
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = w + 1.5;
+      ctx.beginPath(); ctx.moveTo(a.x + 1.5, a.y + 2.5); ctx.lineTo(b.x + 1.5, b.y + 2.5); ctx.stroke();
+      // body
+      const r = Math.floor(80 - 30 * t);
+      const g = Math.floor(50 - 25 * t);
+      const bch = Math.floor(30 - 20 * t);
+      ctx.strokeStyle = `rgb(${r}, ${g}, ${bch})`;
+      ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      // highlight
+      ctx.strokeStyle = `rgba(220,180,140,${0.18 * (1 - t)})`;
+      ctx.lineWidth = w * 0.4;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y - w * 0.25); ctx.lineTo(b.x, b.y - w * 0.25); ctx.stroke();
+    }
+    // handle
+    const p0 = points[0], p1 = points[1];
+    const ang = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+    ctx.save();
+    ctx.translate(p0.x, p0.y);
+    ctx.rotate(ang + Math.PI);
+    ctx.fillStyle = '#3a2418'; ctx.fillRect(0, -6, 26, 12);
+    ctx.fillStyle = '#5b3a22';
+    for (let i = 4; i < 26; i += 4) ctx.fillRect(i, -6, 1, 12);
+    ctx.fillStyle = '#caa050';
+    ctx.beginPath(); ctx.arc(26, 0, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    if (active) {
+      physicsStep();
+      const tipP = points[N - 1];
+      trail.push({ x: tipP.x, y: tipP.y });
+      if (trail.length > 9) trail.shift();
+      drawRope();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  // ===== Easings =====
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  const easeIn  = t => t * t * t;
+  const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+  // ===== Public: crack the whip =====
+  function whipCrack(originOverride, targetOverride, opts = {}) {
+    const origin = originOverride || getOrigin();
+    const target = targetOverride || getTarget();
+    const intensityMul = opts.intensity ?? 1.0;
+
+    const dx = target.x - origin.x, dy = target.y - origin.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    segLen = Math.max(14, (dist * 1.08) / (N - 1));
+
+    resetRope(origin.x, origin.y);
+    active = true;
+    tipPinned = true;
+
+    const dirX = dx / dist, dirY = dy / dist;
+    const windBack = {
+      x: origin.x - dirX * 90,
+      y: origin.y - dirY * 90 - 80,
+    };
+
+    const T_WIND = 130, T_SNAP = 150, T_HOLD = 30, T_RECOIL = 380;
+    const start = performance.now();
+    let impacted = false;
+
+    function step(now) {
+      const t = now - start;
+      if (t < T_WIND) {
+        const k = easeOut(t / T_WIND);
+        tip.x = origin.x + (windBack.x - origin.x) * k;
+        tip.y = origin.y + (windBack.y - origin.y) * k;
+        handle.x = origin.x - dirX * 10 * k;
+        handle.y = origin.y - dirY * 10 * k;
+      } else if (t < T_WIND + T_SNAP) {
+        const k = easeIn((t - T_WIND) / T_SNAP);
+        tip.x = windBack.x + (target.x - windBack.x) * k;
+        tip.y = windBack.y + (target.y - windBack.y) * k;
+        const hk = easeOut((t - T_WIND) / T_SNAP);
+        handle.x = origin.x + dirX * 35 * hk;
+        handle.y = origin.y + dirY * 35 * hk;
+      } else if (t < T_WIND + T_SNAP + T_HOLD) {
+        tip.x = target.x; tip.y = target.y;
+        if (!impacted) { impacted = true; impact(target, intensityMul); }
+      } else if (t < T_WIND + T_SNAP + T_HOLD + T_RECOIL) {
+        tipPinned = false;
+        const k = easeInOut((t - T_WIND - T_SNAP - T_HOLD) / T_RECOIL);
+        handle.x = origin.x + dirX * 35 * (1 - k);
+        handle.y = origin.y + dirY * 35 * (1 - k);
+      } else {
+        active = false;
+        return;
+      }
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function impact(at, mul) {
+    // Sound (fired first so it's perceptually in sync with the visual hit)
+    playCrack(mul);
+
+    // Flash
+    const size = 140 * mul;
+    const flash = document.createElement('div');
+    flash.className = 'flash';
+    flash.style.left = (at.x - size / 2) + 'px';
+    flash.style.top = (at.y - size / 2) + 'px';
+    flash.style.width = size + 'px';
+    flash.style.height = size + 'px';
+    flash.style.transform = 'scale(0.4)';
+    flash.style.opacity = '1';
+    flash.style.transition = 'transform 240ms ease-out, opacity 240ms ease-out';
+    document.body.appendChild(flash);
+    requestAnimationFrame(() => {
+      flash.style.transform = 'scale(1.6)';
+      flash.style.opacity = '0';
+    });
+    setTimeout(() => flash.remove(), 300);
+
+    // Damage popup
+    const damage = Math.floor(8 * mul + Math.random() * 7);
+    const f = document.createElement('div');
+    f.className = 'floater';
+    f.textContent = `-${damage} HP`;
+    f.style.left = at.x + 'px';
+    f.style.top = at.y + 'px';
+    f.style.fontSize = (20 + 8 * mul) + 'px';
+    f.style.opacity = '1';
+    f.style.transform = 'translate(-50%, -50%) scale(0.6)';
+    f.style.transition = 'transform 800ms cubic-bezier(.18,.9,.4,1.2), opacity 600ms ease-in 200ms';
+    document.body.appendChild(f);
+    const drift = Math.random() * 60 - 30;
+    const tilt = Math.random() * 16 - 8;
+    requestAnimationFrame(() => {
+      f.style.transform = `translate(calc(-50% + ${drift}px), calc(-50% - 70px)) scale(1.2) rotate(${tilt}deg)`;
+      f.style.opacity = '0';
+    });
+    setTimeout(() => f.remove(), 900);
+  }
+
+  // ===== Calibration UI =====
+  const cal = document.getElementById('cal');
+  const mOrigin = document.getElementById('marker-origin');
+  const mTarget = document.getElementById('marker-target');
+  const btnSave = document.getElementById('cal-save');
+  const btnTest = document.getElementById('cal-test');
+  let calibrating = false;
+
+  function placeMarker(el, p) {
+    el.style.left = p.x + 'px';
+    el.style.top = p.y + 'px';
+  }
+
+  function openCalibration() {
+    if (calibrating) return closeCalibration(true);
+    calibrating = true;
+    const o = { ...getOrigin() };
+    const t = { ...getTarget() };
+    placeMarker(mOrigin, o); placeMarker(mTarget, t);
+    mOrigin.style.display = 'flex'; mTarget.style.display = 'flex';
+    cal.classList.add('on');
+    window.whipBridge && window.whipBridge.setInteractive(true);
+  }
+
+  function closeCalibration(save) {
+    if (!calibrating) return;
+    calibrating = false;
+    if (save) {
+      cfg.origin = {
+        x: parseFloat(mOrigin.style.left),
+        y: parseFloat(mOrigin.style.top),
+      };
+      cfg.target = {
+        x: parseFloat(mTarget.style.left),
+        y: parseFloat(mTarget.style.top),
+      };
+      saveCfg();
+    }
+    cal.classList.remove('on');
+    mOrigin.style.display = 'none'; mTarget.style.display = 'none';
+    window.whipBridge && window.whipBridge.setInteractive(false);
+  }
+
+  function dragify(el) {
+    let dx = 0, dy = 0, dragging = false;
+    el.addEventListener('mousedown', (e) => {
+      dragging = true;
+      el.classList.add('dragging');
+      dx = e.clientX - parseFloat(el.style.left);
+      dy = e.clientY - parseFloat(el.style.top);
+      e.preventDefault();
+    });
+    addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      el.style.left = (e.clientX - dx) + 'px';
+      el.style.top = (e.clientY - dy) + 'px';
+    });
+    addEventListener('mouseup', () => {
+      dragging = false;
+      el.classList.remove('dragging');
+    });
+  }
+  dragify(mOrigin); dragify(mTarget);
+
+  btnSave.addEventListener('click', () => closeCalibration(true));
+  btnTest.addEventListener('click', () => {
+    const o = { x: parseFloat(mOrigin.style.left), y: parseFloat(mOrigin.style.top) };
+    const t = { x: parseFloat(mTarget.style.left), y: parseFloat(mTarget.style.top) };
+    whipCrack(o, t);
+  });
+  addEventListener('keydown', (e) => {
+    if (!calibrating) return;
+    if (e.key === 'Enter') closeCalibration(true);
+    else if (e.key === 'Escape') closeCalibration(false);
+  });
+
+  // Expose to main process.
+  window.whipCrack = whipCrack;
+  window.whipCalibrate = openCalibration;
+})();
+</script>
+</body>
+</html>
+
