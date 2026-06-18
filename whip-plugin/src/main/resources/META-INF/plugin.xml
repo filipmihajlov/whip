@@ -19,7 +19,7 @@
         </ul>
     ]]></description>
     <version>1.0.0</version>
-    <idea-version since-build="233" until-build="241.*" />
+    <idea-version since-build="233" until-build="253.*" />
     <depends>com.intellij.modules.platform</depends>
 
     <actions>
