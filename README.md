@@ -1,54 +1,58 @@
 # 🪢 Whip
 
-A pair of toys that crack an animated whip on top of your AI chat — because sometimes the assistant *needs* it.
+A JetBrains plugin that cracks an animated whip on top of your editor — because sometimes the AI *needs* motivation.
 
-Two flavours, both self-contained, no admin permissions needed:
+Works with **IntelliJ IDEA**, **Android Studio**, and all JetBrains IDEs (2023.3+).
 
-| Folder | What it is | When to use it |
-|---|---|---|
-| [`whip-demo/`](whip-demo/) | Single HTML file with a fake chat that whips itself on Send | See the animation in 5 seconds — just open `index.html` |
-| [`whip-overlay/`](whip-overlay/) | Electron app: transparent, click-through, always-on-top overlay that draws the whip on **any** window | Real use — strike your actual AI chat |
+## Install
 
-## Quick start
+1. Download the latest zip from `whip-plugin/build/distributions/`
+2. In your IDE: **Settings → Plugins → ⚙️ → Install Plugin from Disk…** → select the zip
+3. Restart
 
-### Demo (browser)
+## Usage
 
-```sh
-open whip-demo/index.html
-```
+| Trigger | What happens |
+|---|---|
+| **⌘⇧↩** (Cmd+Shift+Enter) | Crack the whip |
+| **Tools → Calibrate Whip Layout** | Drag start/end points to position the whip |
+| **Settings → Tools → Whippy** | Toggle sound, auto-mode, color themes, speed profiles |
 
-Type something, press **Enter**, watch the whip crack.
+### Auto-mode (fire on Enter)
 
-### Overlay (Electron, runs in background)
-
-```sh
-cd whip-overlay
-npm install     # one-time
-npm start
-```
-
-A 🪢 appears in the macOS menu bar. Triggers:
-
-- **⌘⇧↩** anywhere → whip cracks
-- **🪢 menu → "Whip now"** → same thing, via the tray
-- **POST http://127.0.0.1:7654/crack** → fire from any app or script (curl, JetBrains External Tools, Stream Deck, etc.)
-
-See [`whip-overlay/README.md`](whip-overlay/README.md) for calibration, sound toggle, and the JetBrains macro setup that makes ⌘↩ both send the message *and* fire the whip.
+When enabled in settings, the whip fires on every plain **Enter** keypress across the IDE. See the FAQ below for limiting it to Copilot Chat only.
 
 ## What's under the hood
 
 - **Whip rope** — 24-point Verlet physics chain with distance-constraint relaxation. Wind-up → snap → impact → recoil scripted; intermediate points free-move so the rope curves naturally.
-- **Impact** — radial flash with `mix-blend-mode: screen`, CSS shake, floating damage number.
-- **Sound** — WebAudio: filtered noise burst (the "crack") + 160 → 42 Hz sine sweep (the "thwack"). No audio files.
-- **HTTP trigger** (overlay only) — tiny `http.createServer` bound to `127.0.0.1` so scripts and shortcuts can fire it without OS keyboard hooks.
+- **Impact** — radial flash with screen-blend, shake, floating damage number.
+- **Sound** — synthesized noise burst (the "crack") + low sine sweep (the "thwack"). No audio files.
 
-## Built with
+## Build from source
 
-- Vanilla HTML / CSS / JS (no framework)
-- Electron 31 (overlay only)
-- `uiohook-napi` (optional, for auto-fire via OS-level key observation — needs macOS Accessibility permission, so usually disabled)
+```sh
+cd whip-plugin
+./gradlew clean buildPlugin
+```
+
+Output zip: `whip-plugin/build/distributions/`
+
+## Compatibility
+
+| IDE | Minimum version |
+|---|---|
+| IntelliJ IDEA (Community & Ultimate) | 2023.3 |
+| Android Studio | Jellyfish (2023.3.1) |
+| WebStorm, PyCharm, CLion, etc. | 2023.3 |
+
+The plugin declares `com.intellij.modules.platform` as its only dependency, which is the base module present in every JetBrains IDE.
+
+## FAQ
+
+### Can the whip fire only when pressing Enter in GitHub Copilot Chat?
+
+**Yes, with a code change.** Currently auto-mode fires on every unmodified Enter keypress IDE-wide. To restrict it to Copilot Chat only, the `WhipEditorListener` dispatcher can inspect the focused Swing component hierarchy and check whether it belongs to the Copilot Chat tool window (e.g., by walking up the parent chain looking for the `"GitHub Copilot"` tool window content). This is technically straightforward but relies on Copilot's internal UI structure which isn't a stable public API — it may need updates when Copilot versions change.
 
 ## License
 
-MIT — go nuts.
-
+MIT
